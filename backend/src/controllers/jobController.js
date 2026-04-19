@@ -16,11 +16,13 @@ const getJobs = async (req, res, next) => {
     const allowedExperience = ['fresher', '1-2 years', '2-5 years', '5+ years'];
 
     if (search) {
-      query.$text = { $search: search };
+      // Sanitize search: keep only safe text characters for $text search
+      const safeSearch = String(search).replace(/[^\w\s\-.,]/g, ' ').trim().slice(0, 200);
+      if (safeSearch) query.$text = { $search: safeSearch };
     }
-    if (location) query.location = new RegExp(escapeRegex(location), 'i');
+    if (location) query.location = new RegExp(escapeRegex(String(location).slice(0, 100)), 'i');
     if (jobType && allowedJobTypes.includes(jobType)) query.jobType = jobType;
-    if (category) query.category = new RegExp(escapeRegex(category), 'i');
+    if (category) query.category = new RegExp(escapeRegex(String(category).slice(0, 100)), 'i');
     if (experience && allowedExperience.includes(experience)) query.experience = experience;
 
     const skip = (Number(page) - 1) * Number(limit);
