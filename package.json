@@ -1,0 +1,22 @@
+{
+  "name": "kaamsetu",
+  "version": "1.0.0",
+  "description": "India's verified skill-to-gig marketplace for blue-collar workers",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "apps/*",
+    "shared/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=services/api\"",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:migrate": "npm run migrate --workspace=services/api",
+    "db:seed": "npm run seed --workspace=services/api"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

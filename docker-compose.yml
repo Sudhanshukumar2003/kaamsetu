@@ -1,0 +1,68 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL with PostGIS ─────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: kaamsetu_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       kaamsetu
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/api/src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kaamsetu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kaamsetu_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── API Server ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: kaamsetu_api
+    restart: unless-stopped
+    env_file: ./services/api/.env
+    environment:
+      NODE_ENV:    development
+      DB_HOST:     postgres
+      REDIS_URL:   redis://redis:6379
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/api/src:/app/src   # hot reload in dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

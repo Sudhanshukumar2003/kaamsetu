@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "KaamSetu Worker",
+    "slug": "kaamsetu-worker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "scheme": "kaamsetu-worker"
+  }
+}

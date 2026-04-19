@@ -1,0 +1,77 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL with PostGIS ─────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: kaamsetu_postgres
+    environment:
+      POSTGRES_DB:       kaamsetu
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/api/src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U postgres -d kaamsetu"]
+      interval: 5s
+      timeout:  5s
+      retries:  10
+
+  # Test database (same image, separate volume)
+  postgres_test:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: kaamsetu_postgres_test
+    environment:
+      POSTGRES_DB:       kaamsetu_test
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./services/api/src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+
+  # ── Redis ─────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kaamsetu_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test:     ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout:  3s
+      retries:  5
+
+  # ── API (dev with hot reload) ─────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: kaamsetu_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/api/.env
+    environment:
+      DB_HOST:    postgres
+      REDIS_URL:  redis://redis:6379
+    volumes:
+      - ./services/api/src:/app/src   # hot reload in dev
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  postgres_test_data:
+  redis_data:
