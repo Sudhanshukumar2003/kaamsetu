@@ -26,7 +26,7 @@ const updateProfile = async (req, res, next) => {
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
-      allowedUpdate,
+      { $set: allowedUpdate },
       { new: true, runValidators: true }
     );
 

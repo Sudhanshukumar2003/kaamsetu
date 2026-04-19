@@ -31,7 +31,8 @@ const getAllUsers = async (req, res, next) => {
   try {
     const { role, page = 1, limit = 20 } = req.query;
     const allowedRoles = ['user', 'employer', 'admin'];
-    const safeRole = role && allowedRoles.includes(sanitizeString(role)) ? sanitizeString(role) : null;
+    const sanitizedRole = sanitizeString(role);
+    const safeRole = sanitizedRole && allowedRoles.includes(sanitizedRole) ? sanitizedRole : null;
     const query = safeRole ? { role: safeRole } : {};
     const skip = (Number(page) - 1) * Number(limit);
     const total = await User.countDocuments(query);
@@ -52,7 +53,7 @@ const updateUser = async (req, res, next) => {
     const safeRole = role && allowedRoles.includes(role) ? role : null;
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { ...(isActive !== undefined && { isActive: Boolean(isActive) }), ...(safeRole && { role: safeRole }) },
+      { $set: { ...(isActive !== undefined && { isActive: Boolean(isActive) }), ...(safeRole && { role: safeRole }) } },
       { new: true, runValidators: true }
     );
     if (!user) {
@@ -104,7 +105,10 @@ const getAllJobs = async (req, res, next) => {
 // @access Private (admin)
 const updateJobAdmin = async (req, res, next) => {
   try {
-    const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const { isActive } = req.body;
+    const update = {};
+    if (isActive !== undefined) update.isActive = Boolean(isActive);
+    const job = await Job.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true });
     if (!job) {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
