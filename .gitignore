@@ -10,5 +10,6 @@ Thumbs.db
 coverage/
 dist/
 build/
+.next/
 .vscode/
 .idea/
