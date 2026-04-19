@@ -16,7 +16,9 @@ app.use(helmet());
 app.use(compression());
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || config.cors.origins.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true);
+    if (config.env !== 'production') return cb(null, true);
+    if (config.cors.origins.includes(origin)) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,

@@ -319,6 +319,15 @@ router.post('/:id/checkin',
         return res.badRequest(resp, 'Gig is not in a state that allows check-in');
       }
 
+      const payment = (await query(
+        'SELECT status FROM payments WHERE gig_id = $1',
+        [gig.id]
+      )).rows[0];
+
+      if (!payment || payment.status !== 'escrow_held') {
+        return res.badRequest(resp, 'Payment not in escrow. Ask the hirer to deposit before check-in.');
+      }
+
       // Calculate distance from gig location
       const distResult = await query(
         `SELECT ROUND(ST_Distance(
@@ -375,6 +384,15 @@ router.post('/:id/complete',
 
       if (!gig) return res.notFound(resp, 'Gig not found');
       if (gig.status !== 'in_progress') return res.badRequest(resp, 'Gig is not in progress');
+
+      const payment = (await query(
+        'SELECT status FROM payments WHERE gig_id = $1',
+        [gig.id]
+      )).rows[0];
+
+      if (!payment || payment.status !== 'escrow_held') {
+        return res.badRequest(resp, 'Payment not in escrow. Ask the hirer to deposit before completion.');
+      }
 
       await query(
         `UPDATE gigs SET status = 'completed', completed_at = NOW(), updated_at = NOW()

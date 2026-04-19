@@ -154,6 +154,7 @@ export default function GigDetailPage({ params }) {
   const paymentDone    = gig.payment_status === 'escrow_released';
   const canConfirm     = gig.status === 'completed' && paymentHeld;
   const canReview      = (gig.status === 'completed' || paymentDone) && !reviewDone;
+  const escrowMissing  = gig.status !== 'open' && !paymentHeld && !paymentDone;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -249,6 +250,14 @@ export default function GigDetailPage({ params }) {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {escrowMissing && (
+            <div className="card" style={{ background: 'var(--warning-light)', border: '1.5px solid #FCD34D' }}>
+              <h3 style={{ marginBottom: 8, color: 'var(--warning)' }}>⏳ Escrow Required</h3>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 0 }}>
+                The worker cannot check in or complete the job until payment is held in escrow.
+              </p>
+            </div>
+          )}
           {paymentPending && (
             <div className="card" style={{ background: 'var(--warning-light)', border: '1.5px solid #FCD34D' }}>
               <h3 style={{ marginBottom: 8, color: 'var(--warning)' }}>⚡ Action Required — Deposit Payment</h3>

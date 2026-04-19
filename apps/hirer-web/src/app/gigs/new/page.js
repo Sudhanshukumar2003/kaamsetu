@@ -1,5 +1,8 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import * as API from '../../../services/api';
 
 const SKILL_LEVELS = ['beginner','intermediate','expert','master'];
@@ -16,6 +19,8 @@ export default function PostGigPage() {
   const [loading, setLoading] = useState(false);
   const [errors,  setErrors]  = useState({});
   const [success, setSuccess] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [mapPos, setMapPos] = useState([18.52, 73.85]);
 
   const [form, setForm] = useState({
     tradeSlug:          '',
@@ -43,6 +48,68 @@ export default function PostGigPage() {
   }, []);
 
   const set = (key, val) => { setForm(f => ({ ...f, [key]: val })); setErrors(e => ({ ...e, [key]: '' })); };
+
+  const markerIcon = useMemo(() => (
+    L.icon({
+      iconUrl: '/locSymb.png',
+      iconSize: [28, 28],
+      iconAnchor: [14, 28],
+      popupAnchor: [0, -28],
+    })
+  ), []);
+
+  const updateLatLng = (lat, lng) => {
+    const latFixed = Number(lat).toFixed(6);
+    const lngFixed = Number(lng).toFixed(6);
+    set('lat', latFixed);
+    set('lng', lngFixed);
+    setMapPos([Number(latFixed), Number(lngFixed)]);
+  };
+
+  const handleDetectLocation = async () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      alert('Location is not supported in this browser.');
+      return;
+    }
+
+    setLocating(true);
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      updateLatLng(latitude, longitude);
+
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`
+        );
+        if (!resp.ok) throw new Error('Reverse geocode failed');
+        const data = await resp.json();
+        const addr = data.address || {};
+        const city = addr.city || addr.town || addr.village || addr.county || '';
+        const pincode = addr.postcode || '';
+        const road = addr.road || addr.neighbourhood || addr.suburb || '';
+        const house = addr.house_number || '';
+        const street = [house, road].filter(Boolean).join(' ').trim();
+
+        if (street) set('address', street);
+        if (city) set('city', city);
+        if (pincode) set('pincode', pincode);
+      } catch (err) {
+        // Non-blocking if reverse geocoding fails
+      }
+    } catch (err) {
+      alert('Unable to fetch your location. Please allow location access and try again.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const validate = () => {
     const e = {};
@@ -87,6 +154,33 @@ export default function PostGigPage() {
       const msg = err.response?.data?.message || 'Failed to post gig';
       setErrors({ _form: msg });
     } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    const lat = parseFloat(form.lat);
+    const lng = parseFloat(form.lng);
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      setMapPos([lat, lng]);
+    }
+  }, [form.lat, form.lng]);
+
+  const MapClickHandler = () => {
+    useMapEvents({
+      click(e) {
+        updateLatLng(e.latlng.lat, e.latlng.lng);
+      },
+    });
+    return null;
+  };
+
+  const MapRecenter = ({ position }) => {
+    const map = useMap();
+    useEffect(() => {
+      if (position?.length === 2) {
+        map.setView(position, map.getZoom(), { animate: true });
+      }
+    }, [map, position]);
+    return null;
   };
 
   if (success) return (
@@ -191,10 +285,49 @@ export default function PostGigPage() {
             <h3 style={{ marginBottom: 16 }}>Where is the work?</h3>
 
             <div className="form-group">
-              <label className="form-label">Street Address *</label>
-              <input className={`form-input ${errors.address ? 'error' : ''}`}
-                placeholder="Building name, street, area"
-                value={form.address} onChange={e => set('address', e.target.value)} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>Street Address *</label>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={locating}
+                  aria-label="Detect current location"
+                  style={{
+                    position: 'absolute',
+                    left: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface-alt)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                  }}
+                  title="Detect current location"
+                >
+                  <img
+                    src="/locSymb.png"
+                    alt=""
+                    aria-hidden="true"
+                    width="16"
+                    height="16"
+                    style={{ display: 'block' }}
+                  />
+                </button>
+                <input
+                  className={`form-input ${errors.address ? 'error' : ''}`}
+                  style={{ paddingLeft: 50 }}
+                  placeholder="Building name, street, area"
+                  value={form.address}
+                  onChange={e => set('address', e.target.value)}
+                />
+              </div>
               {errors.address && <p className="form-error">{errors.address}</p>}
             </div>
 
@@ -222,6 +355,37 @@ export default function PostGigPage() {
                 <label className="form-label">Longitude (optional)</label>
                 <input className="form-input" placeholder="73.8567" type="number" step="0.0001"
                   value={form.lng} onChange={e => set('lng', e.target.value)} />
+              </div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+                  Drag the pin to set the exact location.
+                </p>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handleDetectLocation} disabled={locating}>
+                  {locating ? 'Detecting…' : 'Use My Location'}
+                </button>
+              </div>
+              <div style={{ height: 260, borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <MapContainer center={mapPos} zoom={15} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
+                  <TileLayer
+                    attribution="&copy; OpenStreetMap contributors"
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <MapRecenter position={mapPos} />
+                  <Marker
+                    position={mapPos}
+                    icon={markerIcon}
+                    draggable
+                    eventHandlers={{
+                      dragend: (e) => {
+                        const { lat, lng } = e.target.getLatLng();
+                        updateLatLng(lat, lng);
+                      },
+                    }}
+                  />
+                  <MapClickHandler />
+                </MapContainer>
               </div>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>

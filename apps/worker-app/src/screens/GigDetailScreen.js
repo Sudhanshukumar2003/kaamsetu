@@ -196,6 +196,7 @@ export default function GigDetailScreen({ route, navigation }) {
   if (loading || !gig) return <LoadingSpinner message="Loading gig details..." />;
 
   const statusColor = gigStatusColor(gig.status);
+  const paymentHeld = gig.payment_status === 'escrow_held';
   const startDate = new Date(gig.start_date).toLocaleDateString('en-IN', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
@@ -322,23 +323,40 @@ export default function GigDetailScreen({ route, navigation }) {
       )}
 
       {gig.status === 'accepted' && (
-        <Button
-          title="📍 Check In at Job Site"
-          onPress={handleCheckin}
-          loading={actionLoading}
-          size="lg"
-          style={{ marginBottom: spacing.sm }}
-        />
+        <View style={{ gap: spacing.sm }}>
+          {!paymentHeld && (
+            <Card style={{ backgroundColor: colors.warningLight, borderWidth: 1.5, borderColor: colors.warning }}>
+              <Text style={{ ...typography.bodyS, color: colors.warning, textAlign: 'center' }}>
+                ⏳ Waiting for hirer to deposit escrow. Check-in unlocks once payment is held.
+              </Text>
+            </Card>
+          )}
+          <Button
+            title="📍 Check In at Job Site"
+            onPress={handleCheckin}
+            loading={actionLoading}
+            size="lg"
+            disabled={!paymentHeld}
+          />
+        </View>
       )}
 
       {gig.status === 'in_progress' && (
         <View style={{ gap: spacing.sm }}>
+          {!paymentHeld && (
+            <Card style={{ backgroundColor: colors.warningLight, borderWidth: 1.5, borderColor: colors.warning }}>
+              <Text style={{ ...typography.bodyS, color: colors.warning, textAlign: 'center' }}>
+                ⏳ Escrow not deposited. Completion is blocked until payment is held.
+              </Text>
+            </Card>
+          )}
           <Button
             title="✅ Mark Job Complete"
             onPress={handleComplete}
             loading={actionLoading}
             variant="success"
             size="lg"
+            disabled={!paymentHeld}
           />
           <Button
             title="⚠️ Raise a Dispute"
