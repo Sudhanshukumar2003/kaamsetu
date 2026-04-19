@@ -1,0 +1,14 @@
+{
+  "name": "kaamsetu",
+  "version": "1.0.0",
+  "description": "Kaamsetu Job Marketplace - Full Stack Application",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "start:backend": "npm start --prefix backend",
+    "dev:backend": "npm run dev --prefix backend",
+    "start:frontend": "npm start --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "test:backend": "npm test --prefix backend"
+  }
+}

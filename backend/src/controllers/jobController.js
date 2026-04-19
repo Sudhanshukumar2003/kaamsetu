@@ -1,0 +1,134 @@
+const Job = require('../models/Job');
+const Application = require('../models/Application');
+
+// @desc  Get all active jobs (with filters)
+// @route GET /api/jobs
+// @access Public
+const getJobs = async (req, res, next) => {
+  try {
+    const { search, location, jobType, category, experience, page = 1, limit = 10 } = req.query;
+
+    const query = { isActive: true };
+
+    if (search) {
+      query.$text = { $search: search };
+    }
+    if (location) query.location = new RegExp(location, 'i');
+    if (jobType) query.jobType = jobType;
+    if (category) query.category = new RegExp(category, 'i');
+    if (experience) query.experience = experience;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = await Job.countDocuments(query);
+    const jobs = await Job.find(query)
+      .populate('employer', 'name companyName')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      jobs,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc  Get single job
+// @route GET /api/jobs/:id
+// @access Public
+const getJob = async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id).populate('employer', 'name companyName companyWebsite companyDescription');
+    if (!job || !job.isActive) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    job.views += 1;
+    await job.save();
+
+    res.json({ success: true, job });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc  Create job
+// @route POST /api/jobs
+// @access Private (employer, admin)
+const createJob = async (req, res, next) => {
+  try {
+    const jobData = {
+      ...req.body,
+      employer: req.user._id,
+      companyName: req.body.companyName || req.user.companyName,
+    };
+    const job = await Job.create(jobData);
+    res.status(201).json({ success: true, job });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc  Update job
+// @route PUT /api/jobs/:id
+// @access Private (employer who owns the job, admin)
+const updateJob = async (req, res, next) => {
+  try {
+    let job = await Job.findById(req.params.id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    // Check ownership unless admin
+    if (req.user.role !== 'admin' && job.employer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update this job' });
+    }
+
+    job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    res.json({ success: true, job });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc  Delete job
+// @route DELETE /api/jobs/:id
+// @access Private (employer who owns the job, admin)
+const deleteJob = async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    if (req.user.role !== 'admin' && job.employer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this job' });
+    }
+
+    await Job.deleteOne({ _id: req.params.id });
+    await Application.deleteMany({ job: req.params.id });
+
+    res.json({ success: true, message: 'Job deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc  Get employer's own jobs
+// @route GET /api/jobs/my
+// @access Private (employer)
+const getMyJobs = async (req, res, next) => {
+  try {
+    const jobs = await Job.find({ employer: req.user._id }).sort({ createdAt: -1 });
+    res.json({ success: true, jobs });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getJobs, getJob, createJob, updateJob, deleteJob, getMyJobs };
