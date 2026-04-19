@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
+const { sanitizeString } = require('../utils/sanitize');
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret', {
@@ -19,7 +20,8 @@ const register = async (req, res, next) => {
 
     const { name, email, password, role, phone, companyName } = req.body;
 
-    const existingUser = await User.findOne({ email });
+    const safeEmail = sanitizeString(email);
+    const existingUser = await User.findOne({ email: safeEmail });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
@@ -28,7 +30,7 @@ const register = async (req, res, next) => {
     const allowedRoles = ['user', 'employer'];
     const userRole = allowedRoles.includes(role) ? role : 'user';
 
-    const user = await User.create({ name, email, password, role: userRole, phone, companyName });
+    const user = await User.create({ name, email: safeEmail, password, role: userRole, phone, companyName });
 
     const token = signToken(user._id);
 
@@ -59,7 +61,8 @@ const login = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email }).select('+password');
+    const safeEmail = sanitizeString(email);
+    const user = await User.findOne({ email: safeEmail }).select('+password');
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }

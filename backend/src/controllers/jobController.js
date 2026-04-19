@@ -1,6 +1,9 @@
 const Job = require('../models/Job');
 const Application = require('../models/Application');
 
+// Escape special regex characters to prevent regex injection
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // @desc  Get all active jobs (with filters)
 // @route GET /api/jobs
 // @access Public
@@ -13,9 +16,9 @@ const getJobs = async (req, res, next) => {
     if (search) {
       query.$text = { $search: search };
     }
-    if (location) query.location = new RegExp(location, 'i');
+    if (location) query.location = new RegExp(escapeRegex(location), 'i');
     if (jobType) query.jobType = jobType;
-    if (category) query.category = new RegExp(category, 'i');
+    if (category) query.category = new RegExp(escapeRegex(category), 'i');
     if (experience) query.experience = experience;
 
     const skip = (Number(page) - 1) * Number(limit);

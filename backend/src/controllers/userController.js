@@ -12,11 +12,21 @@ const getProfile = async (req, res) => {
 // @access Private
 const updateProfile = async (req, res, next) => {
   try {
+    // Destructure only allowed fields to prevent mass assignment
     const { name, phone, bio, skills, resumeUrl, companyName, companyWebsite, companyDescription } = req.body;
+    const allowedUpdate = {};
+    if (name !== undefined) allowedUpdate.name = name;
+    if (phone !== undefined) allowedUpdate.phone = phone;
+    if (bio !== undefined) allowedUpdate.bio = bio;
+    if (skills !== undefined) allowedUpdate.skills = skills;
+    if (resumeUrl !== undefined) allowedUpdate.resumeUrl = resumeUrl;
+    if (companyName !== undefined) allowedUpdate.companyName = companyName;
+    if (companyWebsite !== undefined) allowedUpdate.companyWebsite = companyWebsite;
+    if (companyDescription !== undefined) allowedUpdate.companyDescription = companyDescription;
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
-      { name, phone, bio, skills, resumeUrl, companyName, companyWebsite, companyDescription },
+      allowedUpdate,
       { new: true, runValidators: true }
     );
 

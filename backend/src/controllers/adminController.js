@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Job = require('../models/Job');
 const Application = require('../models/Application');
+const { sanitizeString } = require('../utils/sanitize');
 
 // @desc  Get platform statistics
 // @route GET /api/admin/stats
@@ -29,7 +30,9 @@ const getStats = async (req, res, next) => {
 const getAllUsers = async (req, res, next) => {
   try {
     const { role, page = 1, limit = 20 } = req.query;
-    const query = role ? { role } : {};
+    const allowedRoles = ['user', 'employer', 'admin'];
+    const safeRole = role && allowedRoles.includes(sanitizeString(role)) ? sanitizeString(role) : null;
+    const query = safeRole ? { role: safeRole } : {};
     const skip = (Number(page) - 1) * Number(limit);
     const total = await User.countDocuments(query);
     const users = await User.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit));
@@ -45,9 +48,11 @@ const getAllUsers = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { isActive, role } = req.body;
+    const allowedRoles = ['user', 'employer', 'admin'];
+    const safeRole = role && allowedRoles.includes(role) ? role : null;
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { ...(isActive !== undefined && { isActive }), ...(role && { role }) },
+      { ...(isActive !== undefined && { isActive: Boolean(isActive) }), ...(safeRole && { role: safeRole }) },
       { new: true, runValidators: true }
     );
     if (!user) {
